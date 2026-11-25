@@ -259,7 +259,7 @@ function buildModul() {
   const m = S.modul, t = S.tp[m.tp];
   if (!t) return '<p>Belum ada Tujuan Pembelajaran untuk kelas ini. Buka menu "1. CP, TP & ATP", klik <b>Isi contoh TP Ganjil & Genap</b> atau tambah TP, lalu kembali ke sini.</p>';
   const mnt1 = +m.menit || 35, jpPer = Math.max(1, +m.jpPer || 3), totJp = Math.max(1, +t.jp || jpPer), n = Math.min(12, Math.ceil(totJp / jpPer)), mat = t.materi || 'materi', mnt = jpPer * mnt1, lm = esc(shortM(mat).toLowerCase());
-  const fokus0 = ['Mengenal dan mencoba gerak dasar', 'Mengembangkan teknik dan variasi gerak', 'Menerapkan gerak dalam permainan/aktivitas modifikasi', 'Menampilkan hasil dan asesmen sumatif', 'Pengayaan dan penguatan', 'Refleksi dan perbaikan'], fokus = Array.from({ length: n }, (_, i) => n <= fokus0.length && i === n - 1 && n > 3 ? fokus0[3] : (fokus0[i] || 'Penguatan dan latihan lanjutan'));
+  const mid = ['Mengembangkan teknik dan variasi gerak', 'Menerapkan gerak dalam permainan/aktivitas modifikasi', 'Latihan kombinasi gerak dan permainan kecil', 'Penguatan dan umpan balik', 'Pengayaan dan penguatan'], fokus = Array.from({ length: n }, (_, i) => n === 1 ? 'Mengenal, mencoba, dan menampilkan gerak' : i === 0 ? 'Mengenal dan mencoba gerak dasar' : i === n - 1 ? 'Menampilkan hasil dan asesmen sumatif' : mid[(i - 1) % mid.length]);
   const dimTxt = (t.dimensi || 'Kesehatan, Kolaborasi, Kemandirian').toLowerCase();
   const chk = DIMENSI.map(d => `${dimTxt.includes(d.split(' ')[0].toLowerCase()) ? '☑' : '☐'} ${esc(d)}`).join(' &nbsp; ');
   const row = (grp, span, k, v) => `<tr>${grp ? `<td rowspan="${span}" style="width:90px;background:#d9e2f3;text-align:center"><b>${grp}</b></td>` : ''}<td style="width:170px;background:#f2f6fc"><b>${k}</b></td><td>${v}</td></tr>`;
@@ -300,12 +300,12 @@ function buildModul() {
       ['Pengetahuan gerak', 'Menjelaskan teknik, aturan, dan keselamatan dengan tepat', 'Menjelaskan dengan sedikit bantuan', 'Penjelasan sebagian tepat', 'Belum mampu menjelaskan'],
       ['Sikap/karakter (sportif, kerja sama, disiplin)', 'Selalu menunjukkan', 'Sering menunjukkan', 'Kadang menunjukkan', 'Belum menunjukkan']
     ]) +
-    `<h4>E. LAMPIRAN 1: LKPD (Lembar Kerja Peserta Didik)</h4><p>Nama: ........................ Kelas: ${esc(S.cp.kelas)} Tanggal: ............</p>` +
+    sig() + `<h4 style="page-break-before:always">E. LAMPIRAN 1: LKPD (Lembar Kerja Peserta Didik)</h4><p>Nama: ........................ Kelas: ${esc(S.cp.kelas)} Tanggal: ............</p>` +
     tbl(['No', 'Tugas / Pertanyaan', 'Hasil / Jawaban'], [[1, `Tuliskan 3 langkah teknik ${lm} yang kamu pelajari.`, ''], [2, 'Catat hasil percobaanmu (jumlah berhasil dari 5 percobaan).', ''], [3, 'Berikan 1 saran untuk temanmu setelah mengamati geraknya.', ''], [4, 'Refleksi: bagian mana yang paling menyenangkan dan yang masih sulit?', ''], [5, 'Bagaimana kamu menjaga keselamatan saat bermain?', '']]) +
     `<h4>LAMPIRAN 2: BAHAN BACAAN GURU & PESERTA DIDIK</h4><p>Buku Panduan Guru dan Buku Siswa PJOK Kemendikdasmen, video peragaan teknik ${lm}, serta kartu aturan permainan yang dibuat guru.</p>${bahanExcerpt(mat)}` +
     `<h4>LAMPIRAN 3: REFLEKSI GURU</h4><p>1. Apakah tujuan pembelajaran tercapai? ................<br>2. Kendala saat pembelajaran: ................<br>3. Rencana perbaikan: ................</p>`;
   out += `<h4>LAMPIRAN 4: INSTRUMEN ASESMEN FORMATIF</h4><p>Disusun otomatis dari TP modul ini.</p>` + soalBody('formatif', [{ ...t, i: +m.tp }], PRESET.formatif, 'Keduanya');
-  return out + sig();
+  return out;
 }
 
 /* ---------- Contoh TP Ganjil/Genap per fase ---------- */
