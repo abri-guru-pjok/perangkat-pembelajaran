@@ -118,7 +118,8 @@ function defaults() {
     kaldik: { jpm: 3, rows: MONTHS.map((b, i) => ({ b, total: TOTALW[i], libur: 0 })), asm1: 2, cad1: 2, asm2: 2, cad2: 2 },
     promes: { sem: '1', off: {} },
     modul: { tp: 0, n: 2, menit: 35, model: 'Pembelajaran berbasis permainan (game-based learning) dan inkuiri', alat: 'Bola, cone, peluit, tali, matras, stopwatch' },
-    jurnal: [], files: [], store: {}, kelasAktif: '3'
+    jurnal: [], files: [], store: {}, kelasAktif: '3',
+    soal: { jenis: 'formatif', bagian: 'Pengetahuan dan Praktik', sem: '1', pg: 5, isian: 3, uraian: 0, stsN: 0, waktu: '' }, bahan: null
   };
 }
 const key = () => 'pjok_' + (user ? user.id : 'local');
@@ -130,12 +131,12 @@ async function loadRemote() {
   if (data && data.data) S = merge(data.data);
 }
 function setStatus(t) { $('#status').textContent = t; }
-const PERKELAS = ['cp', 'tp', 'promes', 'modul', 'jurnal'], KJP = ['jpm', 'asm1', 'cad1', 'asm2', 'cad2'];
+const PERKELAS = ['cp', 'tp', 'promes', 'modul', 'jurnal', 'soal', 'bahan'], KJP = ['jpm', 'asm1', 'cad1', 'asm2', 'cad2'];
 const faseOf = k => +k <= 2 ? 'A' : +k <= 4 ? 'B' : 'C';
 function pack() { const o = { kjp: {} }; PERKELAS.forEach(f => o[f] = S[f]); KJP.forEach(f => o.kjp[f] = S.kaldik[f]); S.store[S.kelasAktif] = JSON.parse(JSON.stringify(o)); }
 function switchKelas(k) {
   pack(); k = String(k); S.kelasAktif = k; const d = defaults(), o = S.store[k];
-  PERKELAS.forEach(f => S[f] = o ? JSON.parse(JSON.stringify(o[f])) : d[f]);
+  PERKELAS.forEach(f => S[f] = (o && o[f] !== undefined) ? JSON.parse(JSON.stringify(o[f])) : d[f]);
   KJP.forEach(f => S.kaldik[f] = o ? o.kjp[f] : d.kaldik[f]);
   S.cp.fase = faseOf(k); S.cp.kelas = k; save(); render();
 }
@@ -224,7 +225,7 @@ const DOCS = {
       const t = sortedTp(s); const tot = t.reduce((x, y) => x + (+y.jp || 0), 0), asm = +S.kaldik['asm' + s] || 0, cad = +S.kaldik['cad' + s] || 0;
       const rows = t.map((x, n) => [n + 1, esc(x.materi), esc(x.tp), x.jp]);
       rows.push(['', '<b>Asesmen Sumatif</b>', 'Asesmen sumatif lingkup materi', asm], ['', '<b>Cadangan</b>', 'Pengayaan / remedial / jam kosong', cad], ['', '<b>Jumlah</b>', `Jam efektif tersedia: ${kc.jam} JP`, tot + asm + cad]);
-      out += `<h4>Semester ${s}</h4>` + tbl(['No', 'Lingkup Materi', 'Tujuan Pembelajaran', 'Alokasi JP'], rows) + (tot + asm + cad > kc.jam ? `<p style="color:red">Perhatian: kebutuhan JP melebihi jam efektif (${tot + asm + cad - kc.jam} JP).</p>` : '');
+      out += `<h4>Semester ${s} (${s === '1' ? 'Ganjil' : 'Genap'})</h4>` + tbl(['No', 'Lingkup Materi', 'Tujuan Pembelajaran', 'Alokasi JP'], rows) + (tot + asm + cad > kc.jam ? `<p style="color:red">Perhatian: kebutuhan JP melebihi jam efektif (${tot + asm + cad - kc.jam} JP).</p>` : '');
     });
     return out + sig();
   } },
@@ -234,9 +235,10 @@ const DOCS = {
     const h1 = '<tr><th rowspan="2">No</th><th rowspan="2">Materi / TP</th><th rowspan="2">JP</th>' + mons.map(m => `<th colspan="${m.n}">${MONTHS[m.mi]}</th>`).join('') + '</tr>';
     const h2 = '<tr>' + mons.map(m => Array.from({ length: m.n }, (_, k) => `<th>${k + 1}</th>`).join('')).join('') + '</tr>';
     const body = al.items.map((it, n) => `<tr><td>${n + 1}</td><td>${it.label}</td><td>${it.jp}</td>` + mons.map(m => Array.from({ length: m.n }, (_, k) => { const w = k + 1, off = weekOff(m.mi, w); return `<td style="${off ? 'background:#999' : ''};text-align:center">${off ? '' : (it.cells[m.mi + '-' + w] || '')}</td>`; }).join('')).join('') + '</tr>').join('');
-    return kop(`PROGRAM SEMESTER ${sem} (PROMES)`) + info() + `<table><thead>${h1}${h2}</thead><tbody>${body}</tbody></table><p>Kolom abu-abu = minggu tidak efektif (libur/ujian/kegiatan sekolah).${al.rest > 0 ? ` <b style="color:red">${al.rest} JP belum teralokasi — tambah minggu efektif atau kurangi JP.</b>` : ''}</p>` + sig();
+    return kop(`PROGRAM SEMESTER ${sem} ${sem === '1' ? '(GANJIL)' : '(GENAP)'} (PROMES)`) + info() + `<table><thead>${h1}${h2}</thead><tbody>${body}</tbody></table><p>Kolom abu-abu = minggu tidak efektif (libur/ujian/kegiatan sekolah).${al.rest > 0 ? ` <b style="color:red">${al.rest} JP belum teralokasi — tambah minggu efektif atau kurangi JP.</b>` : ''}</p>` + sig();
   } },
   modul: { title: 'Modul_Ajar', land: false, build() { return buildModul(); } },
+  soal: { title: 'Soal_Asesmen', land: false, build() { return buildSoal(); } },
   jurnal: { title: 'Jurnal_Mengajar', land: true, build() {
     const rows = S.jurnal.map((j, n) => [n + 1, esc(j.tgl), esc(j.jam), esc(j.kelas), esc(j.pert), esc(j.materi), esc(j.absen || '-'), esc(j.tuntas ? j.tuntas + '%' : ''), esc(j.kendala || '-'), esc(j.tl || '-')]);
     return kop('JURNAL MENGAJAR') + info() + tbl(['No', 'Hari/Tanggal', 'Jam ke-', 'Kelas', 'Pert. ke-', 'TP / Materi', 'Siswa Tidak Hadir', 'Ketuntasan', 'Kendala', 'Tindak Lanjut'], rows) + sig();
@@ -275,9 +277,239 @@ function buildModul() {
     ]) + `<p><b>Pengayaan:</b> siswa membuat variasi permainan sendiri dan menjadi tutor sebaya. <b>Remedial:</b> latihan ulang gerak dasar dengan bimbingan guru dan alat yang disederhanakan.</p>` +
     `<h4>E. LKPD (Lembar Kerja Peserta Didik)</h4><p>Nama: ........................ Kelas: ${esc(S.cp.kelas)} Tanggal: ............</p>` +
     tbl(['No', 'Tugas / Pertanyaan', 'Hasil / Jawaban'], [[1, `Tuliskan 3 langkah teknik ${esc(mat.toLowerCase())} yang kamu pelajari.`, ''], [2, 'Catat hasil percobaanmu (jumlah berhasil dari 5 percobaan).', ''], [3, 'Berikan 1 saran untuk temanmu setelah mengamati geraknya.', ''], [4, 'Refleksi: bagian mana yang paling menyenangkan dan yang masih sulit?', ''], [5, 'Bagaimana kamu menjaga keselamatan saat bermain?', '']]) +
-    `<h4>F. BAHAN BACAAN GURU & PESERTA DIDIK</h4><p>Buku Panduan Guru dan Buku Siswa PJOK Kemendikdasmen, video peragaan teknik ${esc(mat.toLowerCase())}, serta kartu aturan permainan yang dibuat guru.</p>` +
+    `<h4>F. BAHAN BACAAN GURU & PESERTA DIDIK</h4><p>Buku Panduan Guru dan Buku Siswa PJOK Kemendikdasmen, video peragaan teknik ${esc(mat.toLowerCase())}, serta kartu aturan permainan yang dibuat guru.</p>${bahanExcerpt(mat)}` +
     `<h4>G. REFLEKSI GURU</h4><p>1. Apakah tujuan pembelajaran tercapai? ................<br>2. Kendala saat pembelajaran: ................<br>3. Rencana perbaikan: ................</p>`;
+  out += `<h4>H. LAMPIRAN: INSTRUMEN ASESMEN FORMATIF</h4><p>Disusun otomatis dari TP modul ini (soal sumatif ada di menu "6. Soal & Asesmen").</p>` + soalBody('formatif', [{ ...t, i: +m.tp }], PRESET.formatif, 'Keduanya');
   return out + sig();
+}
+
+/* ---------- Contoh TP Ganjil/Genap per fase ---------- */
+const SAMPLE = {
+  A: {
+    1: [['Gerak dasar lokomotor (berjalan, berlari, melompat)', 0], ['Gerak dasar nonlokomotor (membungkuk, meregang, memutar)', 0], ['Permainan bola besar sederhana (menggelindingkan dan menangkap bola)', 0], ['Kebiasaan hidup sehat dan kebersihan diri', 1]],
+    2: [['Gerak dasar manipulatif (melempar, menangkap, menendang bola)', 0], ['Aktivitas senam dasar (guling dan keseimbangan)', 0], ['Aktivitas ritmik sederhana mengikuti irama', 0], ['Permainan tradisional dan kebugaran jasmani sederhana', 2]]
+  },
+  B: {
+    1: [['Gerak dasar atletik (lari, lompat, lempar)', 0], ['Permainan bola kecil (melempar dan menangkap, kasti sederhana)', 0], ['Kebugaran jasmani dan kesehatan', 2], ['Pola makan sehat dan istirahat cukup', 1]],
+    2: [['Permainan bola besar (sepak bola, basket, bola voli mini)', 0], ['Senam lantai dasar (guling depan dan keseimbangan)', 0], ['Aktivitas ritmik/tari kreasi', 0], ['Permainan tradisional daerah dan olahraga rekreasi', 2]]
+  },
+  C: {
+    1: [['Atletik (lari estafet, lompat jauh, tolak/lempar)', 0], ['Permainan bola kecil (kasti/rounders)', 0], ['Kebugaran jasmani (komponen dan latihan)', 2], ['Pola hidup sehat dan gizi seimbang', 1]],
+    2: [['Permainan bola besar (sepak bola, basket, bola voli)', 0], ['Senam lantai dan kelincahan', 0], ['Aktivitas ritmik/senam irama', 0], ['Permainan tradisional dan olahraga rekreasi', 2]]
+  }
+};
+function tpText(m, e) {
+  const x = shortM(m).toLowerCase();
+  if (e === 1) return `Melalui pembelajaran mendalam, peserta didik mampu menjelaskan konsep, aturan, dan manfaat ${x} serta menerapkannya dalam kehidupan sehari-hari.`;
+  if (e === 2) return `Melalui pembelajaran mendalam, peserta didik mampu memanfaatkan ${x} untuk menjaga kebugaran dan kesehatan secara mandiri.`;
+  return `Melalui pembelajaran mendalam, peserta didik mampu mempraktikkan ${x} dengan teknik yang benar, bekerja sama, dan menunjukkan sikap sportif serta menjaga keselamatan.`;
+}
+function addSample() {
+  [1, 2].forEach(s => SAMPLE[S.cp.fase][s].forEach(([m, e]) => S.tp.push({ sem: s, elemen: ELEMEN[e], materi: m, tp: tpText(m, e), jp: 14, dimensi: e === 1 ? 'Penalaran Kritis, Kesehatan, Kemandirian' : 'Kesehatan, Kolaborasi, Kemandirian' })));
+}
+
+/* ---------- Bahan ajar dari berkas (pdf/docx/txt) ---------- */
+function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('Gagal memuat pustaka pembaca berkas')); document.head.appendChild(s); }); }
+async function extractText(file) {
+  const n = file.name.toLowerCase();
+  if (/\.(txt|md)$/.test(n)) return await file.text();
+  if (n.endsWith('.docx')) {
+    if (!window.mammoth) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+    return (await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value;
+  }
+  if (n.endsWith('.pdf')) {
+    if (!window.pdfjsLib) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise; let t = '';
+    for (let i = 1; i <= Math.min(pdf.numPages, 150); i++) { const c = await (await pdf.getPage(i)).getTextContent(); t += c.items.map(x => x.str + (x.hasEOL ? '\n' : ' ')).join('') + '\n'; }
+    return t;
+  }
+  return '';
+}
+const bahanStatus = () => S.bahan ? `<p class="hint">📖 Bahan ajar terbaca: <b>${esc(S.bahan.nama)}</b> (${S.bahan.teks.length} karakter) <button class="btn red" data-act="delBahan">Lepas</button></p>` : '<p class="hint">Unggah buku/bahan ajar (.pdf, .docx, .txt) agar teksnya dibaca dan dipakai untuk membuat TP, kutipan bahan di Modul Ajar, dan soal isian.</p>';
+function bahanTitles() {
+  const L = S.bahan.teks.split('\n').map(l => l.replace(/\s+/g, ' ').trim()), found = [];
+  L.forEach((l, i) => {
+    let m = l.match(/^(?:bab|unit|materi|tema)\s*[0-9ivx]+\s*[:.\-–]?\s*(.{3,90})$/i), t = m && m[1];
+    if (!t && /^(?:bab|unit)\s*[0-9ivx]+$/i.test(l)) t = L.slice(i + 1).find(x => x.length > 2 && x.length < 90);
+    if (t && !found.includes(t)) found.push(t);
+  });
+  return found.slice(0, 20);
+}
+function bahanExcerpt(mat) {
+  if (!S.bahan) return '';
+  const w = shortM(mat).toLowerCase().split(/[^a-zà-ÿ]+/).filter(x => x.length > 4);
+  const ss = S.bahan.teks.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+/).filter(x => x.length > 40 && x.length < 220 && w.some(k => x.toLowerCase().includes(k))).slice(0, 3);
+  return ss.length ? `<p><b>Kutipan bahan dari berkas "${esc(S.bahan.nama)}":</b> ${esc(ss.join(' '))}</p>` : '';
+}
+function cloze(it) {
+  if (!S.bahan) return [];
+  const w = shortM(it.materi).toLowerCase().split(/[^a-zà-ÿ]+/).filter(x => x.length > 4), out = [];
+  for (const s of S.bahan.teks.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+/)) {
+    if (s.length < 40 || s.length > 180 || !w.some(k => s.toLowerCase().includes(k))) continue;
+    const key = (s.match(/[A-Za-zÀ-ÿ]{6,}/g) || []).sort((a, b) => b.length - a.length)[0];
+    if (key) out.push([`Lengkapi kalimat dari bahan ajar: ${s.replace(key, '_____')}`, key]);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+/* ---------- Bank soal PJOK (pg: [soal, benar, [pengecoh x3]]; isian: [soal, jawaban]; uraian: [soal, pedoman]) ---------- */
+const BANK = {
+  atletik: { kw: ['atletik', 'lari', 'lompat', 'lempar', 'tolak', 'estafet'], pg: [
+    ['Lari jarak pendek disebut juga lari …', 'sprint', ['maraton', 'estafet', 'gawang']],
+    ['Urutan aba-aba pada start jongkok yang benar adalah …', 'bersedia – siap – ya', ['siap – bersedia – ya', 'ya – siap – bersedia', 'siap – ya – bersedia']],
+    ['Pada lari estafet, tongkat diserahkan kepada pelari berikutnya di …', 'daerah pergantian', ['garis finis', 'garis start', 'luar lintasan']],
+    ['Tumpuan pada lompat jauh dilakukan dengan …', 'satu kaki pada papan tumpu', ['dua kaki sambil berjalan', 'tangan menyentuh tanah', 'kaki diseret']],
+    ['Tempat mendarat pada lompat jauh berisi …', 'pasir', ['air', 'rumput', 'kerikil']],
+    ['Agar lemparan bola jauh, bola dilempar dengan sudut kira-kira …', '45 derajat ke atas', ['lurus ke bawah', 'lurus ke samping', 'menyentuh tanah']]],
+    isian: [['Benda yang dipindahkan antarpelari pada lari estafet disebut ___', 'tongkat (baton)'], ['Gerakan awal berlari sebelum menolak pada lompat jauh disebut ___', 'awalan'], ['Lari jarak jauh terutama melatih daya tahan ___ dan paru-paru', 'jantung']],
+    uraian: [['Jelaskan urutan gerakan lompat jauh gaya jongkok!', 'Awalan → tolakan/tumpuan → melayang di udara → mendarat dengan dua kaki. Skor maks 4 (tiap tahap benar = 1).'], ['Sebutkan tiga sikap sportif saat mengikuti perlombaan lari!', 'Contoh: jujur, menerima kekalahan, menghargai lawan, tidak curang, mengikuti aturan. Skor 1 tiap sikap, maks 3 (nilai 4 jika disertai alasan).']] },
+  bolabesar: { kw: ['bola besar', 'sepak bola', 'basket', 'voli'], pg: [
+    ['Menggiring bola pada permainan sepak bola disebut …', 'dribbling', ['shooting', 'passing', 'heading']],
+    ['Mengumpan bola jarak dekat dengan akurat pada sepak bola menggunakan kaki bagian …', 'dalam', ['ujung', 'luar', 'tumit']],
+    ['Memantulkan bola ke lantai dengan satu tangan sambil bergerak pada bola basket disebut …', 'menggiring (dribble)', ['servis', 'smash', 'heading']],
+    ['Passing bawah pada bola voli menggunakan bagian …', 'lengan bawah', ['ujung jari', 'telapak kaki', 'siku saja']],
+    ['Pukulan pertama untuk memulai permainan bola voli disebut …', 'servis', ['smash', 'blok', 'umpan']],
+    ['Pemain yang boleh memegang bola dengan tangan di daerah penalti pada sepak bola adalah …', 'penjaga gawang', ['penyerang', 'pemain belakang', 'pelatih']],
+    ['Sikap yang benar ketika regu kita kalah adalah …', 'menerima dengan lapang dada dan memberi selamat', ['marah kepada wasit', 'menyalahkan teman', 'meninggalkan lapangan']]],
+    isian: [['Memasukkan bola ke ring pada bola basket disebut ___', 'shooting (menembak)'], ['Pukulan keras ke daerah lawan pada bola voli disebut ___', 'smash'], ['Dalam permainan beregu, kita harus saling ___ agar tim menang', 'bekerja sama']],
+    uraian: [['Jelaskan langkah-langkah melakukan passing bawah bola voli!', 'Kaki dibuka selebar bahu, lutut ditekuk, kedua lengan lurus dan rapat, bola dipukul dengan lengan bawah, badan mengikuti arah bola. Skor maks 4.'], ['Sebutkan tiga manfaat permainan bola besar secara beregu!', 'Melatih kebugaran, kerja sama, sportivitas, disiplin, kepercayaan diri. Skor 1 tiap manfaat, maks 3.']] },
+  bolakecil: { kw: ['kasti', 'rounders', 'bola kecil'], pg: [
+    ['Permainan kasti dimainkan oleh dua regu, yaitu regu …', 'pemukul dan regu penjaga', ['servis dan penerima', 'penyerang dan bek', 'pelempar saja']],
+    ['Alat untuk memukul bola dalam permainan kasti adalah …', 'pemukul (tongkat kasti)', ['raket', 'stik hoki', 'gada']],
+    ['Setelah memukul bola, pemukul berlari menuju …', 'tiang hinggap (tiang bebas)', ['garis finis', 'gawang', 'ring']],
+    ['Cara mematikan lawan yang sedang berlari pada kasti adalah melempar bola mengenai …', 'tubuh lawan', ['tiang penjaga', 'tanah di depan lawan', 'tangan pelempar sendiri']],
+    ['Agar lemparan bola tepat sasaran, mata harus …', 'tertuju pada sasaran', ['dipejamkan', 'menoleh ke samping', 'melihat ke tanah']]],
+    isian: [['Regu yang memukul bola pada permainan kasti disebut regu ___', 'pemukul'], ['Bola ditangkap dengan ___ tangan agar tidak lepas', 'kedua']],
+    uraian: [['Jelaskan cara melempar bola kecil dengan benar!', 'Kuda-kuda, mata pada sasaran, tangan menarik ke belakang, ayunan lengan dan langkah kaki berlawanan, gerak lanjutan. Skor maks 4.']] },
+  senam: { kw: ['senam', 'guling', 'lantai', 'keseimbangan', 'kelincahan'], pg: [
+    ['Senam lantai dilakukan di atas …', 'matras', ['pasir', 'aspal', 'rumput basah']],
+    ['Pada guling depan, kepala harus …', 'ditekuk dan dagu didekatkan ke dada', ['mendongak ke atas', 'menyentuh lantai dengan dahi', 'menoleh ke samping']],
+    ['Guling depan dimulai dari sikap …', 'jongkok dengan kedua tangan di matras', ['berdiri tegak tanpa tangan', 'tidur telentang', 'duduk bersila']],
+    ['Gerakan yang melatih kelentukan tubuh adalah …', 'peregangan (stretching)', ['berlari sprint', 'memukul bola', 'menendang bola']],
+    ['Agar seimbang saat berdiri satu kaki, pandangan sebaiknya …', 'tertuju pada satu titik di depan', ['ke bawah terus', 'ke segala arah', 'dipejamkan']],
+    ['Sebelum senam lantai kita perlu …', 'pemanasan agar otot tidak cedera', ['langsung berguling', 'makan banyak', 'tidur']]],
+    isian: [['Gerak berputar ke depan dengan tubuh membulat disebut ___', 'guling depan'], ['Alas yang aman untuk senam lantai disebut ___', 'matras'], ['Kemampuan sendi dan otot bergerak luas disebut ___', 'kelentukan']],
+    uraian: [['Jelaskan langkah-langkah guling depan!', 'Jongkok, tangan bertumpu di matras, kepala ditekuk dagu ke dada, dorong dengan kaki, punggung membulat berguling, kembali ke sikap jongkok/berdiri. Skor maks 4.'], ['Sebutkan tiga aturan keselamatan saat senam lantai!', 'Memakai matras, pemanasan, tidak berdesakan, menunggu giliran, area bersih. Skor 1 tiap aturan, maks 3.']] },
+  ritmik: { kw: ['ritmik', 'irama', 'tari', 'kreasi'], pg: [
+    ['Gerak ritmik dilakukan dengan mengikuti …', 'irama atau ketukan musik', ['aba-aba lomba', 'suara angin', 'kecepatan lari teman']],
+    ['Gerak yang dilakukan di tempat tanpa berpindah disebut gerak …', 'nonlokomotor', ['lokomotor', 'manipulatif', 'akrobatik']],
+    ['Tiga unsur penting dalam menari adalah …', 'wiraga, wirama, dan wirasa', ['kostum, panggung, dan lampu', 'nada, lirik, dan alat musik', 'kecepatan, kekuatan, dan jarak']],
+    ['Pola lantai adalah …', 'jalur yang dilalui penari di lantai', ['hiasan di lantai', 'alas lantai', 'warna pakaian penari']],
+    ['Kecepatan lagu pengiring gerak disebut …', 'tempo', ['lirik', 'nada', 'warna']]],
+    isian: [['Gerak berpindah tempat mengikuti irama disebut gerak ___', 'lokomotor'], ['Ketukan musik dihitung dalam ___ (misalnya 1–8)', 'hitungan'], ['Kesesuaian gerak dengan irama disebut ___', 'wirama']],
+    uraian: [['Jelaskan cara menyusun rangkaian gerak ritmik sederhana!', 'Pilih musik, tentukan gerak dasar, susun dalam hitungan 1–8, atur pola lantai, latih bersama kelompok. Skor maks 4.'], ['Sebutkan tiga manfaat aktivitas ritmik!', 'Kelenturan, koordinasi, kepercayaan diri, kerja sama, kegembiraan. Skor 1 tiap manfaat, maks 3.']] },
+  kebugaran: { kw: ['kebugaran', 'sehat', 'gizi', 'makan', 'kesehatan', 'bersih'], pg: [
+    ['Lari jarak jauh atau jogging melatih kebugaran …', 'daya tahan jantung dan paru-paru', ['kelentukan saja', 'kecepatan menulis', 'kekuatan jari']],
+    ['Latihan sit up terutama melatih otot …', 'perut', ['telapak tangan', 'kaki bawah', 'leher saja']],
+    ['Makanan bergizi seimbang mengandung …', 'karbohidrat, protein, lemak, vitamin, dan mineral', ['gula dan garam saja', 'minyak saja', 'makanan ringan saja']],
+    ['Agar tidak dehidrasi saat olahraga kita harus …', 'minum air putih secukupnya', ['menahan haus', 'minum minuman bersoda banyak', 'tidak minum sama sekali']],
+    ['Waktu tidur yang cukup untuk anak usia sekolah dasar kira-kira …', '9–11 jam per hari', ['3–4 jam', '5–6 jam', '14–16 jam']],
+    ['Kebiasaan menjaga kebersihan diri setelah berolahraga adalah …', 'mandi dan mengganti pakaian', ['tidur memakai pakaian basah', 'tidak mencuci tangan', 'berbagi handuk dengan teman']]],
+    isian: [['Kemampuan sendi bergerak luas disebut ___', 'kelentukan'], ['Kemampuan tubuh bekerja lama tanpa lelah berlebihan disebut daya ___', 'tahan'], ['Push up terutama melatih kekuatan otot ___ dan lengan', 'dada']],
+    uraian: [['Sebutkan tiga kebiasaan hidup sehat yang kamu lakukan setiap hari!', 'Contoh: sarapan, minum air putih, tidur cukup, berolahraga, mencuci tangan, menggosok gigi. Skor 1 tiap kebiasaan, maks 3.'], ['Jelaskan mengapa kita perlu berolahraga secara teratur!', 'Menjaga kebugaran, menguatkan otot dan tulang, meningkatkan daya tahan tubuh, membuat gembira, mencegah penyakit. Skor maks 4.']] },
+  dasar: { kw: ['gerak dasar', 'lokomotor', 'nonlokomotor', 'manipulatif'], pg: [
+    ['Gerak yang berpindah tempat disebut gerak …', 'lokomotor', ['nonlokomotor', 'manipulatif', 'diam']],
+    ['Contoh gerak lokomotor adalah …', 'berlari dan melompat', ['membungkuk di tempat', 'memutar badan di tempat', 'meregangkan tangan di tempat']],
+    ['Contoh gerak nonlokomotor adalah …', 'membungkuk dan memutar badan di tempat', ['berlari', 'melompat jauh', 'berjalan maju']],
+    ['Gerak yang menggunakan alat atau bola, misalnya melempar dan menangkap, disebut …', 'manipulatif', ['lokomotor', 'nonlokomotor', 'statis']],
+    ['Saat mendarat dari lompatan, lutut sebaiknya …', 'ditekuk', ['dikunci lurus', 'diangkat tinggi', 'dijauhkan dari badan']]],
+    isian: [['Gerak berpindah tempat disebut gerak ___', 'lokomotor'], ['Melempar dan menangkap bola termasuk gerak ___', 'manipulatif'], ['Membungkuk dan meregang di tempat termasuk gerak ___', 'nonlokomotor']],
+    uraian: [['Sebutkan tiga contoh gerak lokomotor!', 'Berjalan, berlari, melompat, berjingkat, skipping. Skor 1 tiap contoh, maks 3.'], ['Jelaskan perbedaan gerak lokomotor dan nonlokomotor!', 'Lokomotor berpindah tempat; nonlokomotor dilakukan di tempat tanpa berpindah. Skor maks 4.']] }
+};
+function generic(m) {
+  return {
+    pg: [
+      [`Sebelum melakukan ${m}, kita sebaiknya melakukan …`, 'pemanasan', ['langsung bermain', 'makan banyak', 'tidur']],
+      ['Sikap yang baik saat bermain bersama teman adalah …', 'sportif dan menghargai teman', ['curang agar menang', 'mengejek teman', 'memaksa teman']],
+      ['Setelah selesai berolahraga, kita perlu melakukan …', 'pendinginan', ['langsung tidur', 'makan sambil berlari', 'berhenti mendadak lalu berbaring']],
+      ['Agar terhindar dari cedera saat berolahraga, kita harus …', 'mengikuti aturan dan teknik yang benar', ['bermain sambil bercanda', 'mengabaikan perintah guru', 'berebut alat']],
+      ['Manfaat olahraga teratur bagi tubuh adalah …', 'tubuh sehat dan bugar', ['mudah sakit', 'cepat lelah', 'malas bergerak']],
+      ['Pakaian yang tepat untuk berolahraga adalah …', 'pakaian olahraga dan sepatu yang nyaman', ['sandal licin', 'baju tebal dan sangat ketat', 'pakaian sekolah lengkap dengan dasi']]],
+    isian: [['Gerakan melemaskan otot sebelum olahraga disebut ___', 'pemanasan'], ['Menerima kemenangan dan kekalahan dengan jujur disebut sikap ___', 'sportif'], ['Gerakan menenangkan tubuh setelah olahraga disebut ___', 'pendinginan'], [`Salah satu aturan keselamatan saat ${m} adalah mengikuti ___ guru`, 'arahan']],
+    uraian: [[`Jelaskan manfaat ${m} bagi kesehatan tubuh!`, 'Jawaban berkaitan dengan kebugaran, kekuatan otot, daya tahan, kesehatan, dan kegembiraan. Skor maks 4.'], [`Sebutkan tiga aturan keselamatan saat ${m}!`, 'Pemanasan, pakaian/sepatu sesuai, mengikuti arahan guru, tidak berdesakan, memeriksa area. Skor 1 tiap aturan, maks 3.']]
+  };
+}
+function bankFor(materi) {
+  const l = String(materi || '').toLowerCase(), r = { pg: [], isian: [], uraian: [] };
+  Object.values(BANK).forEach(b => { if (b.kw.some(k => l.includes(k))) ['pg', 'isian', 'uraian'].forEach(t => r[t].push(...b[t])); });
+  const g = generic(shortM(materi).toLowerCase()); ['pg', 'isian', 'uraian'].forEach(t => r[t].push(...g[t])); return r;
+}
+
+/* ---------- Soal & Asesmen ---------- */
+const JENIS = { formatif: ['ASESMEN FORMATIF', 'Formatif', 15], slm: ['ASESMEN SUMATIF LINGKUP MATERI', 'Sumatif Lingkup Materi', 40], sts: ['ASESMEN SUMATIF TENGAH SEMESTER (STS)', 'Sumatif Tengah Semester (STS)', 60], sas: ['ASESMEN SUMATIF AKHIR SEMESTER (SAS)', 'Sumatif Akhir Semester (SAS)', 60] };
+const PRESET = { formatif: [5, 3, 0], slm: [10, 5, 2], sts: [15, 5, 3], sas: [20, 5, 3] };
+const shortM = m => String(m || '').replace(/\s*\(.*?\)/g, '').trim() || 'materi';
+function soalItems(jenis) {
+  if (jenis === 'formatif' || jenis === 'slm') { const t = S.tp[S.modul.tp]; return t ? [{ ...t, i: +S.modul.tp }] : []; }
+  const all = sortedTp(S.soal.sem);
+  return jenis === 'sas' ? all : all.slice(0, +S.soal.stsN || Math.ceil(all.length / 2));
+}
+function pickQs(items, type, n, off) {
+  const pools = items.map(it => { const p = bankFor(it.materi)[type]; if (type === 'isian') return cloze(it).concat(p); const o = p.length ? off % p.length : 0; return p.slice(o).concat(p.slice(0, o)); });
+  const idx = items.map(() => 0), seen = new Set(), out = []; let r = 0;
+  while (out.length < n && !pools.every((p, j) => idx[j] >= p.length)) {
+    const k = r++ % items.length, p = pools[k];
+    while (idx[k] < p.length && seen.has(p[idx[k]][0])) idx[k]++;
+    if (idx[k] < p.length) { const e = p[idx[k]++]; seen.add(e[0]); out.push({ e, it: items[k] }); }
+  }
+  return out;
+}
+const blankRows = (n, cols) => Array.from({ length: n }, (_, i) => [i + 1, '&nbsp;', ...Array(cols).fill('')]);
+function praktikHtml(jenis, items) {
+  const m = items.map(i => shortM(i.materi)).join('; ');
+  let h = `<h4>B. ASESMEN PRAKTIK (UNJUK KERJA)</h4><p>Materi: ${esc(m)}</p>`;
+  if (jenis === 'formatif') {
+    const ind = ['Melakukan pemanasan dengan benar', `Melakukan gerak ${m} sesuai petunjuk guru`, 'Memperbaiki gerak setelah menerima umpan balik', 'Menunjukkan sikap sportif dan bekerja sama', 'Memperhatikan keselamatan diri dan teman'];
+    h += '<p><b>Lembar Observasi Formatif</b> — beri tanda ✓ pada indikator yang muncul.</p>' + tbl(['No', 'Nama Peserta Didik', ...ind.map((x, i) => 'I' + (i + 1)), 'Catatan'], blankRows(10, 6)) + '<p>Keterangan indikator:</p><ol>' + ind.map(x => `<li>${esc(x)}</li>`).join('') + '</ol><p>Saran tindak lanjut: peserta didik dengan ≥4 indikator → pengayaan; ≤3 indikator → bimbingan/remedial.</p>';
+  } else {
+    h += '<p><b>Rubrik Penilaian Unjuk Kerja</b> (skor 1–4 per aspek)</p>' + tbl(['Aspek', 'Sangat Baik (4)', 'Baik (3)', 'Cukup (2)', 'Perlu Bimbingan (1)'], [
+      ['Teknik gerak', `Melakukan ${esc(m)} dengan teknik benar, lancar, dan konsisten`, 'Teknik benar, kadang kurang lancar', 'Sebagian teknik benar', 'Teknik belum benar, perlu bantuan'],
+      ['Koordinasi dan ketepatan', 'Gerak terkoordinasi dan tepat sasaran', 'Sebagian besar tepat', 'Kadang tepat', 'Belum tepat'],
+      ['Sikap sportif dan kerja sama', 'Selalu sportif, menghargai teman, bekerja sama', 'Sering menunjukkan', 'Kadang-kadang', 'Belum menunjukkan'],
+      ['Keselamatan dan disiplin', 'Selalu pemanasan, patuh aturan, aman', 'Sering', 'Kadang-kadang', 'Belum menunjukkan']]) +
+      '<p><b>Lembar Penilaian Praktik</b></p>' + tbl(['No', 'Nama Peserta Didik', 'Teknik', 'Koordinasi', 'Sikap', 'Keselamatan', 'Jumlah', 'Nilai'], blankRows(10, 6)) + '<p>Nilai Praktik = (Jumlah skor ÷ 16) × 100.</p>';
+  }
+  return h;
+}
+function soalBody(jenis, items, cnt, bagian) {
+  const off = { formatif: 0, slm: 3, sts: 1, sas: 2 }[jenis], doP = bagian !== 'Praktik', doK = bagian !== 'Pengetahuan';
+  let out = '';
+  if (doP) {
+    const pg = pickQs(items, 'pg', cnt[0], off), is = pickQs(items, 'isian', cnt[1], off), ur = pickQs(items, 'uraian', cnt[2], off);
+    const map = new Map(items.map(it => [it.i, { pg: [], is: [], ur: [] }])); let no = 0, sheet = '', key = '';
+    sheet += `<h4>A. LEMBAR SOAL PENGETAHUAN</h4><p>Nama: ........................ Kelas: ${esc(S.cp.kelas)} Hari/Tanggal: ............</p>`;
+    if (pg.length) {
+      sheet += '<p><b>I. Pilihan Ganda.</b> Pilihlah jawaban yang paling benar!</p>'; key += '<p><b>Kunci Pilihan Ganda</b> (skor 1 tiap soal benar)</p>'; const ks = [];
+      pg.forEach((x, qi) => { no++; const p = qi % 4, arr = [...x.e[2]]; arr.splice(p, 0, x.e[1]); const L = 'ABCD'[p]; map.get(x.it.i).pg.push(no); ks.push(no + '. ' + L);
+        sheet += `<p>${no}. ${esc(x.e[0])}<br>` + arr.map((o, j) => `&nbsp;&nbsp;&nbsp;${'ABCD'[j]}. ${esc(o)}`).join('<br>') + '</p>'; });
+      key += '<p>' + ks.join(' &nbsp; ') + '</p>';
+    }
+    if (is.length) {
+      sheet += '<p><b>II. Isian Singkat.</b> Lengkapi titik-titik berikut dengan jawaban yang tepat!</p>'; key += '<p><b>Kunci Isian Singkat</b> (skor 2 tiap soal benar)</p><ol start="' + (no + 1) + '">';
+      is.forEach(x => { no++; map.get(x.it.i).is.push(no); sheet += `<p>${no}. ${esc(x.e[0])}</p>`; key += `<li>${esc(x.e[1])}</li>`; }); key += '</ol>';
+    }
+    if (ur.length) {
+      sheet += '<p><b>III. Uraian.</b> Jawablah dengan jelas dan lengkap!</p>'; key += '<p><b>Pedoman Penskoran Uraian</b> (skor maksimal 4 tiap soal)</p><ol start="' + (no + 1) + '">';
+      ur.forEach(x => { no++; map.get(x.it.i).ur.push(no); sheet += `<p>${no}. ${esc(x.e[0])}</p><p>................................................................<br>................................................................</p>`; key += `<li>${esc(x.e[1])}</li>`; }); key += '</ol>';
+    }
+    const mx = pg.length + is.length * 2 + ur.length * 4;
+    const kisi = '<h4>KISI-KISI SOAL</h4>' + tbl(['No', 'Lingkup Materi', 'Tujuan Pembelajaran / Indikator', 'Pilihan Ganda', 'Isian', 'Uraian'], items.map((it, n) => { const q = map.get(it.i); return [n + 1, esc(it.materi), esc(it.tp), q.pg.join(', ') || '-', q.is.join(', ') || '-', q.ur.join(', ') || '-']; }));
+    const warn = (pg.length < cnt[0] || is.length < cnt[1] || ur.length < cnt[2]) ? `<p style="color:red">Bank soal baru menyediakan ${pg.length} PG, ${is.length} isian, ${ur.length} uraian untuk materi ini. Tambahkan soal secara manual pada kotak ini.</p>` : '';
+    out += kisi + warn + sheet + '<div style="page-break-before:always"></div><h4>KUNCI JAWABAN DAN PEDOMAN PENSKORAN</h4>' + key +
+      tbl(['Bentuk Soal', 'Jumlah', 'Skor per Soal', 'Skor Maksimal'], [['Pilihan Ganda', pg.length, 1, pg.length], ['Isian Singkat', is.length, 2, is.length * 2], ['Uraian', ur.length, 4, ur.length * 4], ['<b>Total</b>', '', '', `<b>${mx}</b>`]]) + `<p>Nilai Pengetahuan = (Skor perolehan ÷ ${mx}) × 100.</p>`;
+  }
+  if (doK) out += (doP ? '<div style="page-break-before:always"></div>' : '') + praktikHtml(jenis, items);
+  if (doP && doK) out += '<p><b>Nilai Akhir Asesmen</b> = gabungan Nilai Pengetahuan dan Nilai Praktik dengan bobot yang ditetapkan guru/satuan pendidikan (contoh: Pengetahuan 40% + Praktik 60%).</p>';
+  return out;
+}
+function buildSoal() {
+  const o = S.soal, jenis = o.jenis, J = JENIS[jenis], items = soalItems(jenis);
+  if (!items.length) return '<p>Tambahkan TP pada menu "1. CP, TP & ATP" terlebih dahulu' + (jenis === 'sts' || jenis === 'sas' ? ` (untuk semester ${esc(o.sem)}).` : '.') + '</p>';
+  const bagian = o.bagian === 'Pengetahuan' ? 'Pengetahuan' : o.bagian === 'Praktik' ? 'Praktik' : 'Keduanya';
+  const det = [['Jenis Asesmen', J[1]], ['Bagian', o.bagian], ['Semester', jenis === 'formatif' || jenis === 'slm' ? esc(items[0].sem) : esc(o.sem) + (o.sem === '1' ? ' (Ganjil)' : ' (Genap)')], ['Materi / TP', items.map(i => esc(shortM(i.materi))).join('; ')], ['Alokasi Waktu', esc(o.waktu || J[2] + ' menit')]];
+  return kop(J[0]) + info() + `<table class="nb" style="width:100%;border:none">${det.map(r => `<tr><td style="width:170px;border:none">${r[0]}</td><td style="border:none">: ${r[1]}</td></tr>`).join('')}</table><br>` + soalBody(jenis, items, [+o.pg || 0, +o.isian || 0, +o.uraian || 0], bagian) + sig();
 }
 
 /* ---------- Upload berkas ---------- */
@@ -294,7 +526,10 @@ function importRows(menu, rows) {
 }
 async function handleUpload(menu, file) {
   let msg = '';
-  if (/\.(csv|txt)$/i.test(file.name) && ['atp', 'kaldik', 'jurnal'].includes(menu)) msg = ` ${importRows(menu, parseCSV(await file.text()))} baris diimpor.`;
+  if (/\.csv$/i.test(file.name) && ['atp', 'kaldik', 'jurnal'].includes(menu)) msg = ` ${importRows(menu, parseCSV(await file.text()))} baris diimpor.`;
+  if (/\.(pdf|docx|txt|md)$/i.test(file.name) && ['atp', 'modul', 'soal'].includes(menu)) {
+    try { setStatus('Membaca isi berkas…'); const t = await extractText(file); if (t.trim()) { S.bahan = { nama: file.name, teks: t.replace(/\r/g, '').slice(0, 60000) }; msg = ` Teks terbaca (${t.length} karakter) dan dipakai sebagai bahan ajar.`; } else msg = ' Teks tidak terbaca (mungkin PDF hasil pindai/scan).'; } catch (e) { msg = ' Gagal membaca isi berkas: ' + e.message; }
+  }
   const entry = { menu, name: file.name, path: '' };
   if (sb && user) {
     const path = `${user.id}/${menu}/${Date.now()}_${file.name.replace(/[^\w.\-]/g, '_')}`;
@@ -303,7 +538,7 @@ async function handleUpload(menu, file) {
   }
   S.files.push(entry); save(); render(); alert('Berkas "' + file.name + '" tersimpan.' + msg);
 }
-const uploadPanel = (menu, hint) => `<div class="card"><h3>📎 Upload Berkas</h3><p class="hint">${hint}</p><input type="file" data-upload="${menu}"><div class="files">${S.files.map((f, i) => f.menu === menu ? `<div><span>📄 ${esc(f.name)}</span><span>${f.path ? `<button class="btn" data-act="getFile" data-i="${i}">Unduh</button> ` : ''}<button class="btn red" data-act="delFile" data-i="${i}">Hapus</button></span></div>` : '').join('')}</div></div>`;
+const uploadPanel = (menu, hint) => `<div class="card"><h3>📎 Upload Berkas</h3><p class="hint">${hint}</p><input type="file" data-upload="${menu}">${['atp', 'modul', 'soal'].includes(menu) ? bahanStatus() : ''}<div class="files">${S.files.map((f, i) => f.menu === menu ? `<div><span>📄 ${esc(f.name)}</span><span>${f.path ? `<button class="btn" data-act="getFile" data-i="${i}">Unduh</button> ` : ''}<button class="btn red" data-act="delFile" data-i="${i}">Hapus</button></span></div>` : '').join('')}</div></div>`;
 const docPanel = (id, label) => `<div class="card"><h3>📄 Hasil ${label}</h3><div class="row"><button class="btn gold" data-act="gen" data-id="${id}">⚙️ Generate</button><button class="btn blue" data-act="dl" data-id="${id}">⬇️ Download (.doc / Word)</button><button class="btn" data-act="print" data-id="${id}">🖨️ Cetak / Simpan PDF</button></div><p class="hint">Hasil bisa diedit langsung pada kotak di bawah sebelum diunduh.</p><div id="prev-${id}" class="paper" contenteditable="true"></div></div>`;
 
 /* ---------- Download Word (MHTML, gambar ikut tertanam) ---------- */
@@ -327,7 +562,7 @@ function printHtml(html, land) {
 }
 
 /* ---------- Views ---------- */
-const MENUS = [['beranda', '🏠 Beranda & Identitas'], ['atp', '1. CP, TP & ATP'], ['kaldik', '2. Minggu Efektif'], ['prota', '3. Program Tahunan'], ['promes', '4. Program Semester'], ['modul', '5. Modul Ajar / RPP'], ['jurnal', '6. Jurnal Mengajar']];
+const MENUS = [['beranda', '🏠 Beranda & Identitas'], ['atp', '1. CP, TP & ATP'], ['kaldik', '2. Minggu Efektif'], ['prota', '3. Program Tahunan'], ['promes', '4. Program Semester'], ['modul', '5. Modul Ajar / RPP'], ['soal', '6. Soal & Asesmen'], ['jurnal', '7. Jurnal Mengajar']];
 const imgField = (p, label, max = 500, fmt = 'png') => `<div><label>${label}</label><input type="file" accept="image/*" data-img="${p}" data-max="${max}" data-fmt="${fmt}">${gp(p) ? `<img class="imgprev" src="${gp(p)}"><button class="btn red" data-act="delImg" data-p="${p}">Hapus</button>` : ''}</div>`;
 const sel = (p, label, opts, extra = '') => `<div><label>${label}</label><select data-k="${p}" ${extra}>${opts.map(o => `<option ${String(gp(p)) === String(o) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`;
 const head = (t, s) => `<h1>${t}</h1><p class="sub">${s}</p>`;
@@ -337,12 +572,12 @@ const VIEWS = {
     `<div class="card"><h3>🏫 Identitas Sekolah</h3><div class="grid">${inp('id.pemda', 'Pemerintah / Dinas (kop)', 'text', 'PEMERINTAH KABUPATEN ...')}${inp('id.sekolah', 'Nama Sekolah')}${inp('id.npsn', 'NPSN')}${inp('id.alamat', 'Alamat Sekolah')}${inp('id.kota', 'Kota/Tempat Tanda Tangan')}${inp('id.tanggalTtd', 'Tanggal Tanda Tangan', 'text', 'kosongkan = hari ini')}${inp('id.tahunAjaran', 'Tahun Ajaran')}</div></div>` +
     `<div class="card"><h3>👤 Kepala Sekolah & Guru</h3><div class="grid">${inp('id.kepsek', 'Nama Kepala Sekolah')}${inp('id.nipKs', 'NIP Kepala Sekolah')}${inp('id.guru', 'Nama Guru PJOK')}${inp('id.nipGuru', 'NIP Guru')}</div></div>` +
     `<div class="card"><h3>🖋️ Kop Surat, Logo, TTD & Cap</h3><p class="hint">Kop Surat (gambar) otomatis dipakai di semua dokumen dan menggantikan kop teks. Untuk TTD/cap gunakan PNG latar transparan.</p><div class="grid">${imgField('id.kop', 'Kop Surat (gambar lebar)', 1100, 'jpeg')}${imgField('id.logo', 'Logo Sekolah (kop teks)')}${imgField('id.ttdKs', 'TTD Kepala Sekolah')}${imgField('id.cap', 'Cap Sekolah')}${imgField('id.ttdGuru', 'TTD Guru')}</div></div>` +
-    `<div class="card"><h3>Alur Kerja</h3><p>Pilih <b>Kelas yang disusun</b> (1–6) di menu kiri, lalu kerjakan menu 1 → 6. Data tiap kelas tersimpan terpisah. Setiap menu: isi data atau upload berkas → <b>Generate</b> → <b>Download</b> (Word) atau <b>Cetak/PDF</b>.</p></div>`,
+    `<div class="card"><h3>Alur Kerja</h3><p>Pilih <b>Kelas yang disusun</b> (1–6) di menu kiri, lalu kerjakan menu 1 → 7. Data tiap kelas tersimpan terpisah. Setiap menu: isi data atau upload berkas → <b>Generate</b> → <b>Download</b> (Word) atau <b>Cetak/PDF</b>.</p></div>`,
 
   atp: () => head('1. CP, TP & ATP', 'Analisis CP, rumuskan TP, urutkan menjadi ATP, dan perkirakan JP per materi.') +
     `<div class="card"><h3>Capaian Pembelajaran</h3><p>Kelas <b>${S.cp.kelas}</b> — Fase <b>${S.cp.fase}</b> <span class="hint">(ganti kelas lewat pilihan "Kelas yang disusun" di menu kiri)</span></p><label style="margin-top:8px">Teks CP (salin dari dokumen resmi Kemendikdasmen/BSKAP)</label><textarea data-k="cp.cp" placeholder="Tempel CP PJOK fase terkait...">${esc(S.cp.cp)}</textarea></div>` +
-    uploadPanel('atp', 'Unggah dokumen CP/ATP referensi. File .csv/.txt dengan kolom <i>semester;elemen;materi;tujuan pembelajaran;JP;dimensi</i> akan otomatis diimpor sebagai TP.') +
-    `<div class="card"><h3>Tujuan Pembelajaran & Alur (ATP)</h3><div class="row"><button class="btn gold" data-act="addTp">＋ Tambah TP</button><button class="btn" data-act="sample">✨ Isi contoh TP sesuai fase</button></div><div class="scroll"><table class="tbl"><tr><th>Smt</th><th>Elemen</th><th>Lingkup Materi</th><th>Tujuan Pembelajaran</th><th>JP</th><th>Dimensi Profil</th><th></th></tr>${S.tp.map((t, i) => `<tr><td style="width:60px"><select data-k="tp.${i}.sem"><option ${t.sem == 1 ? 'selected' : ''}>1</option><option ${t.sem == 2 ? 'selected' : ''}>2</option></select></td><td><select data-k="tp.${i}.elemen">${ELEMEN.map(e => `<option ${t.elemen === e ? 'selected' : ''}>${e}</option>`).join('')}</select></td><td><textarea data-k="tp.${i}.materi">${esc(t.materi)}</textarea></td><td><textarea data-k="tp.${i}.tp">${esc(t.tp)}</textarea></td><td style="width:60px"><input type="number" data-num="1" data-k="tp.${i}.jp" value="${esc(t.jp)}"></td><td><input data-k="tp.${i}.dimensi" value="${esc(t.dimensi || '')}" placeholder="Kesehatan, Kolaborasi"></td><td style="white-space:nowrap"><button class="btn" data-act="upTp" data-i="${i}">↑</button><button class="btn red" data-act="delTp" data-i="${i}">✕</button></td></tr>`).join('')}</table></div><p class="hint">Dimensi Profil Lulusan: ${DIMENSI.join(', ')}.</p></div>` + docPanel('atp', 'ATP'),
+    uploadPanel('atp', 'Unggah buku/dokumen CP-ATP (.pdf/.docx/.txt) untuk dibaca. File .csv dengan kolom <i>semester;elemen;materi;tujuan pembelajaran;JP;dimensi</i> akan otomatis diimpor sebagai TP.') +
+    `<div class="card"><h3>Tujuan Pembelajaran & Alur (ATP)</h3><div class="row"><button class="btn gold" data-act="addTp">＋ Tambah TP</button><button class="btn" data-act="sample">✨ Isi contoh TP Ganjil & Genap</button>${S.bahan ? '<button class="btn" data-act="bahanTp">📖 Buat TP dari Bab pada berkas bahan</button>' : ''}</div><div class="scroll"><table class="tbl"><tr><th>Smt</th><th>Elemen</th><th>Lingkup Materi</th><th>Tujuan Pembelajaran</th><th>JP</th><th>Dimensi Profil</th><th></th></tr>${S.tp.map((t, i) => `<tr><td style="width:110px"><select data-k="tp.${i}.sem"><option value="1" ${t.sem == 1 ? 'selected' : ''}>1 Ganjil</option><option value="2" ${t.sem == 2 ? 'selected' : ''}>2 Genap</option></select></td><td><select data-k="tp.${i}.elemen">${ELEMEN.map(e => `<option ${t.elemen === e ? 'selected' : ''}>${e}</option>`).join('')}</select></td><td><textarea data-k="tp.${i}.materi">${esc(t.materi)}</textarea></td><td><textarea data-k="tp.${i}.tp">${esc(t.tp)}</textarea></td><td style="width:60px"><input type="number" data-num="1" data-k="tp.${i}.jp" value="${esc(t.jp)}"></td><td><input data-k="tp.${i}.dimensi" value="${esc(t.dimensi || '')}" placeholder="Kesehatan, Kolaborasi"></td><td style="white-space:nowrap"><button class="btn" data-act="upTp" data-i="${i}">↑</button><button class="btn red" data-act="delTp" data-i="${i}">✕</button></td></tr>`).join('')}</table></div><p class="hint">Dimensi Profil Lulusan: ${DIMENSI.join(', ')}.</p></div>` + docPanel('atp', 'ATP'),
 
   kaldik: () => { const c = kaldikCalc(); return head('2. Analisis Alokasi Waktu & Minggu Efektif', 'Sesuaikan dengan Kalender Pendidikan daerah dan jadwal mengajar Anda.') +
     uploadPanel('kaldik', 'Unggah Kaldik (PDF/gambar sebagai arsip). File .csv dengan kolom <i>bulan;total minggu;minggu tidak efektif</i> (12 baris, Juli–Juni) akan otomatis mengisi tabel.') +
@@ -358,7 +593,13 @@ const VIEWS = {
     uploadPanel('modul', 'Unggah template modul ajar sekolah, bahan bacaan, atau video peragaan sebagai arsip.') +
     `<div class="card"><div class="grid"><div><label>Pilih TP</label><select data-k="modul.tp" data-num="1">${S.tp.map((t, i) => `<option value="${i}" ${+S.modul.tp === i ? 'selected' : ''}>${i + 1}. ${esc((t.materi || '').slice(0, 50))}</option>`).join('')}</select></div>${inp('modul.n', 'Jumlah pertemuan', 'number').replace('<input', '<input data-num="1"')}${inp('modul.menit', 'Menit per JP (SD=35)', 'number').replace('<input', '<input data-num="1"')}${inp('modul.model', 'Model/Pendekatan')}${inp('modul.alat', 'Alat & Media')}</div></div>` + docPanel('modul', 'Modul Ajar'),
 
-  jurnal: () => head('6. Jurnal Mengajar', 'Catat pelaksanaan pembelajaran sebagai bukti keterlaksanaan Promes dan Modul Ajar.') +
+  soal: () => head('6. Soal & Asesmen', 'Soal formatif dan sumatif (pengetahuan & praktik) otomatis sinkron dengan TP pada Modul Ajar.') +
+    uploadPanel('soal', 'Unggah buku/bahan ajar (.pdf/.docx/.txt). Kalimat penting dari bahan dipakai sebagai soal isian tambahan; soal lain dari bank soal PJOK.') +
+    `<div class="card"><div class="grid"><div><label>Jenis Asesmen</label><select data-k="soal.jenis" data-re="1">${Object.entries(JENIS).map(([k, v]) => `<option value="${k}" ${S.soal.jenis === k ? 'selected' : ''}>${v[1]}</option>`).join('')}</select></div>${sel('soal.bagian', 'Bagian', ['Pengetahuan dan Praktik', 'Pengetahuan', 'Praktik'])}` +
+    (['formatif', 'slm'].includes(S.soal.jenis) ? `<div><label>TP (sama dengan Modul Ajar)</label><select data-k="modul.tp" data-num="1">${S.tp.map((t, i) => `<option value="${i}" ${+S.modul.tp === i ? 'selected' : ''}>${i + 1}. ${esc((t.materi || '').slice(0, 50))}</option>`).join('')}</select></div>` : `<div><label>Semester</label><select data-k="soal.sem" data-re="1"><option value="1" ${S.soal.sem == 1 ? 'selected' : ''}>1 Ganjil</option><option value="2" ${S.soal.sem == 2 ? 'selected' : ''}>2 Genap</option></select></div>` + (S.soal.jenis === 'sts' ? inp('soal.stsN', 'Jumlah TP pertama yang diujikan (0 = separuh)', 'number').replace('<input', '<input data-num="1"') : '')) +
+    `${inp('soal.pg', 'Jumlah Pilihan Ganda', 'number').replace('<input', '<input data-num="1"')}${inp('soal.isian', 'Jumlah Isian Singkat', 'number').replace('<input', '<input data-num="1"')}${inp('soal.uraian', 'Jumlah Uraian', 'number').replace('<input', '<input data-num="1"')}${inp('soal.waktu', 'Alokasi Waktu', 'text', 'kosong = otomatis')}</div><p class="hint">Setelah mengubah pengaturan, klik Generate. Soal disusun dari bank soal PJOK sesuai materi TP; periksa dan edit sebelum dipakai.</p></div>` + docPanel('soal', 'Soal & Asesmen'),
+
+  jurnal: () => head('7. Jurnal Mengajar', 'Catat pelaksanaan pembelajaran sebagai bukti keterlaksanaan Promes dan Modul Ajar.') +
     uploadPanel('jurnal', 'Unggah rekap jurnal lama. File .csv kolom <i>tanggal;jam;kelas;pertemuan;materi;tidak hadir;ketuntasan;kendala;tindak lanjut</i> otomatis diimpor.') +
     `<div class="card"><div class="row"><button class="btn gold" data-act="addJ">＋ Tambah Catatan</button></div><div class="scroll"><table class="tbl"><tr><th>Hari/Tanggal</th><th>Jam ke-</th><th>Kelas</th><th>Pert.</th><th>TP / Materi</th><th>Tidak Hadir</th><th>Tuntas %</th><th>Kendala</th><th>Tindak Lanjut</th><th></th></tr>${S.jurnal.map((j, i) => `<tr>${['tgl', 'jam', 'kelas', 'pert', 'materi', 'absen', 'tuntas', 'kendala', 'tl'].map(f => `<td><textarea data-k="jurnal.${i}.${f}" style="height:48px;min-width:${f === 'materi' ? 160 : 70}px">${esc(j[f])}</textarea></td>`).join('')}<td><button class="btn red" data-act="delJ" data-i="${i}">✕</button></td></tr>`).join('')}</table></div></div>` + docPanel('jurnal', 'Jurnal')
 };
@@ -387,7 +628,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.dataset.k && t.dataset.re) { if (t.dataset.k === 'cp.fase') S.cp.kelas = FASE[S.cp.fase][0]; save(); render(); }
+  if (t.dataset.k && t.dataset.re) { if (t.dataset.k === 'cp.fase') S.cp.kelas = FASE[S.cp.fase][0]; if (t.dataset.k === 'soal.jenis') { const p = PRESET[S.soal.jenis]; S.soal.pg = p[0]; S.soal.isian = p[1]; S.soal.uraian = p[2]; } save(); render(); }
   else if (t.dataset.k && t.tagName === 'SELECT') { save(); }
   if (t.dataset.upload && t.files[0]) handleUpload(t.dataset.upload, t.files[0]);
   if (t.dataset.img && t.files[0]) resizeImg(t.files[0], +t.dataset.max || 500, t.dataset.fmt || 'png').then(d => { sp(t.dataset.img, d); save(); render(); });
@@ -404,9 +645,12 @@ document.addEventListener('click', async e => {
   else if (a === 'addTp') { S.tp.push({ sem: 1, elemen: ELEMEN[0], materi: '', tp: '', jp: 4, dimensi: '' }); save(); render(); }
   else if (a === 'delTp') { S.tp.splice(+d.i, 1); save(); render(); }
   else if (a === 'upTp') { const i = +d.i; if (i > 0) { [S.tp[i - 1], S.tp[i]] = [S.tp[i], S.tp[i - 1]]; save(); render(); } }
-  else if (a === 'sample') {
-    const list = MATERI[S.cp.fase]; list.forEach((m, i) => S.tp.push({ sem: i < Math.ceil(list.length / 2) ? 1 : 2, elemen: ELEMEN[i % 3], materi: m, tp: `Melalui pembelajaran mendalam, peserta didik mampu mempraktikkan ${m.toLowerCase()} dengan teknik yang benar, bekerja sama, dan menunjukkan sikap sportif serta menjaga keselamatan.`, jp: 6, dimensi: 'Kesehatan, Kolaborasi, Kemandirian' })); save(); render();
+  else if (a === 'sample') { addSample(); save(); render(); }
+  else if (a === 'bahanTp') {
+    const t = bahanTitles(); if (!t.length) return alert('Judul Bab/Unit tidak ditemukan pada berkas. Gunakan file .csv atau isi TP manual.');
+    t.forEach((m, n) => S.tp.push({ sem: n < Math.ceil(t.length / 2) ? 1 : 2, elemen: ELEMEN[0], materi: m, tp: tpText(m, 0), jp: 8, dimensi: 'Kesehatan, Kolaborasi, Kemandirian' })); save(); render(); alert(t.length + ' TP dibuat dari judul Bab. Periksa dan edit seperlunya.');
   }
+  else if (a === 'delBahan') { S.bahan = null; save(); render(); }
   else if (a === 'wk') { const k = d.mi + '-' + d.w; S.promes.off[k] = weekOff(+d.mi, +d.w) ? 0 : 1; save(); render(); }
   else if (a === 'resetWk') { S.promes.off = {}; save(); render(); }
   else if (a === 'addJ') { S.jurnal.push({ tgl: '', jam: '', kelas: S.cp.kelas, pert: '', materi: '', absen: '', tuntas: '', kendala: '', tl: '' }); save(); render(); }
