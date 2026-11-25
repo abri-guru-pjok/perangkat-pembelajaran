@@ -117,7 +117,7 @@ function defaults() {
     tp: [],
     kaldik: { jpm: 3, rows: MONTHS.map((b, i) => ({ b, total: TOTALW[i], libur: 0 })), asm1: 2, cad1: 2, asm2: 2, cad2: 2 },
     promes: { sem: '1', off: {} },
-    modul: { tp: 0, n: 2, menit: 35, topik: '', peserta: '', lintas: '', pedagogis: '', kemitraan: '', lingkungan: '', digital: '', model: 'Pembelajaran berbasis permainan (game-based learning) dan inkuiri', alat: 'Bola, cone, peluit, tali, matras, stopwatch' },
+    modul: { tp: 0, n: 2, jpPer: 3, menit: 35, topik: '', peserta: '', lintas: '', pedagogis: '', kemitraan: '', lingkungan: '', digital: '', model: 'Pembelajaran berbasis permainan (game-based learning) dan inkuiri', alat: 'Bola, cone, peluit, tali, matras, stopwatch' },
     jurnal: [], files: [], store: {}, kelasAktif: '3',
     soal: { jenis: 'formatif', bagian: 'Pengetahuan dan Praktik', sem: '1', pg: 5, isian: 3, uraian: 0, stsN: 0, waktu: '' }, bahan: null
   };
@@ -160,7 +160,7 @@ const todayID = () => new Date().toLocaleDateString('id-ID', { day: 'numeric', m
 const tbl = (head, rows, extra = '') => `<table ${extra}><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c ?? ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 function kop(judul) {
   const i = S.id;
-  if (i.kop) { const w = DOCS[cur] && DOCS[cur].land ? 960 : 640; return `<div style="text-align:center"><img src="${i.kop}" width="${w}" style="max-width:100%"></div><h3 style="text-align:center;margin:6px 0">${judul}</h3>`; }
+  if (i.kop) { const w = DOCS[cur] && DOCS[cur].land ? 880 : 540; return `<div style="text-align:center"><img src="${i.kop}" width="${w}" height="${Math.round(w * 0.278)}"></div><h3 style="text-align:center;margin:6px 0">${judul}</h3>`; }
   return `<table class="nb" style="width:100%;border:none"><tr><td style="width:80px;border:none">${i.logo ? `<img src="${i.logo}" height="70">` : ''}</td><td style="text-align:center;border:none"><b>${esc(i.pemda || 'PEMERINTAH DAERAH')}</b><br><b style="font-size:14pt">${esc((i.sekolah || 'NAMA SEKOLAH').toUpperCase())}</b><br>${esc(i.alamat || '')}</td><td style="width:80px;border:none"></td></tr></table><hr style="border:1.5px solid #000"><h3 style="text-align:center;margin:6px 0">${judul}</h3>`;
 }
 function info() {
@@ -258,18 +258,20 @@ const mdv = k => { const v = S.modul[k]; return (v === undefined || v === '') ? 
 function buildModul() {
   const m = S.modul, t = S.tp[m.tp];
   if (!t) return '<p>Belum ada Tujuan Pembelajaran untuk kelas ini. Buka menu "1. CP, TP & ATP", klik <b>Isi contoh TP Ganjil & Genap</b> atau tambah TP, lalu kembali ke sini.</p>';
-  const n = Math.max(1, Math.min(6, +m.n || 1)), mat = t.materi || 'materi', jpPer = Math.max(1, Math.ceil((+t.jp || 2) / n)), mnt = jpPer * (+m.menit || 35), lm = esc(shortM(mat).toLowerCase());
-  const fokus = ['Mengenal dan mencoba gerak dasar', 'Mengembangkan teknik dan variasi gerak', 'Menerapkan gerak dalam permainan/aktivitas modifikasi', 'Menampilkan hasil dan asesmen sumatif', 'Pengayaan dan penguatan', 'Refleksi dan perbaikan'];
+  const mnt1 = +m.menit || 35, jpPer = Math.max(1, +m.jpPer || 3), totJp = Math.max(1, +t.jp || jpPer), n = Math.min(12, Math.ceil(totJp / jpPer)), mat = t.materi || 'materi', mnt = jpPer * mnt1, lm = esc(shortM(mat).toLowerCase());
+  const fokus0 = ['Mengenal dan mencoba gerak dasar', 'Mengembangkan teknik dan variasi gerak', 'Menerapkan gerak dalam permainan/aktivitas modifikasi', 'Menampilkan hasil dan asesmen sumatif', 'Pengayaan dan penguatan', 'Refleksi dan perbaikan'], fokus = Array.from({ length: n }, (_, i) => n <= fokus0.length && i === n - 1 && n > 3 ? fokus0[3] : (fokus0[i] || 'Penguatan dan latihan lanjutan'));
   const dimTxt = (t.dimensi || 'Kesehatan, Kolaborasi, Kemandirian').toLowerCase();
   const chk = DIMENSI.map(d => `${dimTxt.includes(d.split(' ')[0].toLowerCase()) ? '☑' : '☐'} ${esc(d)}`).join(' &nbsp; ');
   const row = (grp, span, k, v) => `<tr>${grp ? `<td rowspan="${span}" style="width:90px;background:#d9e2f3;text-align:center"><b>${grp}</b></td>` : ''}<td style="width:170px;background:#f2f6fc"><b>${k}</b></td><td>${v}</td></tr>`;
   const P = (x, y) => `<i>${x}</i>`;
-  let out = kop('MODUL AJAR PEMBELAJARAN MENDALAM') + info();
-  out += `<h4>PERENCANAAN PEMBELAJARAN MENDALAM</h4><table>` +
-    row('IDENTIFIKASI', 3, 'Peserta Didik', esc(mdv('peserta'))) +
-    row('', 0, 'Materi Pelajaran', `${esc(mat)} — Elemen: ${esc(t.elemen)}. ${esc(t.sem == 2 ? 'Semester 2 (Genap)' : 'Semester 1 (Ganjil)')}. Alokasi waktu ${esc(t.jp)} JP (${n} pertemuan × ${jpPer} JP × ${esc(m.menit)} menit = ${mnt} menit/pertemuan).`) +
+  const idn = [['Nama penyusun', S.id.guru], ['Institusi / asal sekolah', S.id.sekolah], ['Tahun penyusunan', S.id.tahunAjaran], ['Jenjang pendidikan', 'SD/MI'], ['Fase / kelas / semester', `Fase ${S.cp.fase} / Kelas ${S.cp.kelas} / Semester ${t.sem == 2 ? '2 (Genap)' : '1 (Ganjil)'}`], ['Mata pelajaran', 'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)'], ['Judul / topik / materi pokok', m.topik || mat], ['Alokasi waktu', `${totJp} JP (${n} pertemuan; 1 pertemuan = ${jpPer} JP; 1 JP = ${mnt1} menit)`]];
+  let out = `<h2 style="text-align:center;margin:0;font-size:16pt">MODUL AJAR PJOK</h2><h3 style="text-align:center;margin:2px 0 14px">PEMBELAJARAN MENDALAM</h3><h4>IDENTITAS MODUL</h4><table class="nb" border="0" style="width:100%;border:none">${idn.map(r => `<tr><td style="width:210px;border:none">${r[0]}</td><td style="border:none">: ${esc(r[1] || '-')}</td></tr>`).join('')}</table><br>`;
+  out += `<h4>A. IDENTIFIKASI PESERTA DIDIK</h4><table>` +
+    row('', 0, 'Peserta Didik', esc(mdv('peserta'))) +
+    row('', 0, 'Materi Pelajaran', `${esc(mat)} — Elemen: ${esc(t.elemen)}. ${esc(t.sem == 2 ? 'Semester 2 (Genap)' : 'Semester 1 (Ganjil)')}.`) +
+    row('', 0, 'Alokasi Waktu', `<b>${totJp} JP</b> = ${n} pertemuan${totJp % jpPer ? ` (${n - 1} × ${jpPer} JP + 1 × ${totJp % jpPer} JP)` : ` × ${jpPer} JP`}. 1 pertemuan = ${jpPer} JP, 1 JP = ${mnt1} menit, jadi ${mnt} menit per pertemuan.`) +
     row('', 0, 'Dimensi Profil Lulusan', chk) +
-    row('DESAIN PEMBELAJARAN', 8, 'Capaian Pembelajaran', esc(S.cp.cp || `(Tempel CP Fase ${S.cp.fase} pada menu 1)`).replace(/\n/g, '<br>')) +
+    `</table><h4>B. DESAIN PEMBELAJARAN</h4><table>` + row('', 0, 'Capaian Pembelajaran', esc(S.cp.cp || `(Tempel CP Fase ${S.cp.fase} pada menu 1)`).replace(/\n/g, '<br>')) +
     row('', 0, 'Lintas Disiplin Ilmu', esc(mdv('lintas'))) +
     row('', 0, 'Tujuan Pembelajaran', esc(t.tp)) +
     row('', 0, 'Topik Pembelajaran', esc(m.topik || shortM(mat))) +
@@ -277,18 +279,19 @@ function buildModul() {
     row('', 0, 'Kemitraan Pembelajaran', esc(mdv('kemitraan'))) +
     row('', 0, 'Lingkungan Pembelajaran', esc(mdv('lingkungan'))) +
     row('', 0, 'Pemanfaatan Digital', esc(mdv('digital'))) + `</table>`;
-  out += `<h4>PENGALAMAN BELAJAR</h4><p>Prinsip: <b>Berkesadaran</b> (<i>mindful</i>), <b>Bermakna</b> (<i>meaningful</i>), dan <b>Menggembirakan</b> (<i>joyful</i>) melalui tahapan Memahami, Mengaplikasi, dan Merefleksi. Pertanyaan pemantik: (1) Mengapa kita perlu melakukan ${lm} dengan teknik yang benar? (2) Bagaimana menjaga keselamatan diri dan teman saat bermain? (3) Apa yang bisa kamu lakukan agar timmu bermain lebih baik?</p>`;
+  out += `<h4>C. PENGALAMAN PEMBELAJARAN</h4><p>Prinsip: <b>Berkesadaran</b> (<i>mindful</i>), <b>Bermakna</b> (<i>meaningful</i>), dan <b>Menggembirakan</b> (<i>joyful</i>) melalui tahapan Memahami, Mengaplikasi, dan Merefleksi. Pertanyaan pemantik: (1) Mengapa kita perlu melakukan ${lm} dengan teknik yang benar? (2) Bagaimana menjaga keselamatan diri dan teman saat bermain? (3) Apa yang bisa kamu lakukan agar timmu bermain lebih baik?</p>`;
   for (let i = 0; i < n; i++) {
     const pertama = i === 0, akhir = i === n - 1;
-    out += `<h4>Pertemuan ${i + 1}: ${fokus[i]}</h4><table>` +
+    const jpI = Math.min(jpPer, totJp - i * jpPer), mnt = jpI * mnt1;
+    out += `<h4>Pertemuan ${i + 1}: ${fokus[i]} (${jpI} JP = ${mnt} menit)</h4><table>` +
       row('AWAL', 1, 'Berkesadaran, bermakna, menggembirakan', `Salam, berdoa, presensi, dan cek kesiapan fisik. Guru mengajak peserta didik mengatur napas dan memusatkan perhatian (mindful). Pemanasan dinamis berupa permainan kejar-kejaran/imitasi gerak. Guru menyampaikan tujuan dan mengajukan pertanyaan pemantik. ${pertama ? 'Asesmen awal: tanya jawab pengalaman bergerak.' : 'Mengulas pengalaman pertemuan sebelumnya.'} <i>(${Math.round(mnt * .2)} menit)</i>`) +
       row('INTI', 3, 'Memahami<br><small>(berkesadaran, bermakna)</small>', `Peserta didik mengamati demonstrasi/video/peragaan ${lm}, lalu mendiskusikan teknik, aturan, dan keselamatan dalam kelompok kecil. <i>(${Math.round(mnt * .2)} menit)</i>`) +
       row('', 0, 'Mengaplikasi<br><small>(bermakna, menggembirakan)</small>', `Berlatih bertahap melalui pos/stasiun gerak dan permainan modifikasi (${esc(fokus[i].toLowerCase())}). Peserta didik bergantian peran sebagai pelaku, pengamat, dan pemberi umpan balik; guru memberi umpan balik dan tantangan bertingkat sesuai kemampuan. <i>(${Math.round(mnt * .35)} menit)</i>`) +
       row('', 0, 'Merefleksi<br><small>(berkesadaran, bermakna)</small>', `Mengisi lembar refleksi: apa yang berhasil, apa yang sulit, dan rencana perbaikan. ${akhir ? 'Menampilkan hasil gerak untuk asesmen sumatif.' : ''} <i>(${Math.round(mnt * .1)} menit)</i>`) +
       row('PENUTUP', 1, 'Menggembirakan', `Pendinginan, rangkuman bersama, umpan balik guru, informasi pertemuan berikutnya, berdoa, dan merapikan alat. <i>(${Math.round(mnt * .15)} menit)</i>`) + '</table>';
   }
-  out += `<h4>ASESMEN PEMBELAJARAN</h4><table>` +
-    row('ASESMEN', 4, 'Asesmen pada Awal Pembelajaran (<i>diagnostik</i>)', 'Tanya jawab pengalaman dan kesiapan fisik, pengamatan gerak dasar singkat, untuk memetakan kebutuhan belajar (<i>assessment for learning</i>).') +
+  out += `<h4>D. ASESMEN</h4><table>` +
+    row('', 0, 'Asesmen pada Awal Pembelajaran (<i>diagnostik</i>)', 'Tanya jawab pengalaman dan kesiapan fisik, pengamatan gerak dasar singkat, untuk memetakan kebutuhan belajar (<i>assessment for learning</i>).') +
     row('', 0, 'Asesmen pada Proses Pembelajaran (<i>formatif</i>)', `Observasi keterampilan gerak, tanya jawab, umpan balik teman sebaya, dan lembar refleksi pada setiap pertemuan (<i>assessment as/for learning</i>). Instrumen: lembar observasi (lampiran).`) +
     row('', 0, 'Asesmen pada Akhir Pembelajaran (<i>sumatif</i>)', `Unjuk kerja ${lm} pada pertemuan terakhir dan tes pengetahuan singkat (<i>assessment of learning</i>). Soal lengkap tersedia di menu "6. Soal & Asesmen".`) +
     row('', 0, 'Pengayaan dan Remedial', 'Pengayaan: membuat variasi permainan sendiri dan menjadi tutor sebaya. Remedial: latihan ulang gerak dasar dengan bimbingan guru dan alat yang disederhanakan.') + '</table><br>' +
@@ -297,11 +300,11 @@ function buildModul() {
       ['Pengetahuan gerak', 'Menjelaskan teknik, aturan, dan keselamatan dengan tepat', 'Menjelaskan dengan sedikit bantuan', 'Penjelasan sebagian tepat', 'Belum mampu menjelaskan'],
       ['Sikap/karakter (sportif, kerja sama, disiplin)', 'Selalu menunjukkan', 'Sering menunjukkan', 'Kadang menunjukkan', 'Belum menunjukkan']
     ]) +
-    `<h4>LAMPIRAN 1. LKPD (Lembar Kerja Peserta Didik)</h4><p>Nama: ........................ Kelas: ${esc(S.cp.kelas)} Tanggal: ............</p>` +
+    `<h4>E. LAMPIRAN 1: LKPD (Lembar Kerja Peserta Didik)</h4><p>Nama: ........................ Kelas: ${esc(S.cp.kelas)} Tanggal: ............</p>` +
     tbl(['No', 'Tugas / Pertanyaan', 'Hasil / Jawaban'], [[1, `Tuliskan 3 langkah teknik ${lm} yang kamu pelajari.`, ''], [2, 'Catat hasil percobaanmu (jumlah berhasil dari 5 percobaan).', ''], [3, 'Berikan 1 saran untuk temanmu setelah mengamati geraknya.', ''], [4, 'Refleksi: bagian mana yang paling menyenangkan dan yang masih sulit?', ''], [5, 'Bagaimana kamu menjaga keselamatan saat bermain?', '']]) +
-    `<h4>LAMPIRAN 2. BAHAN BACAAN GURU & PESERTA DIDIK</h4><p>Buku Panduan Guru dan Buku Siswa PJOK Kemendikdasmen, video peragaan teknik ${lm}, serta kartu aturan permainan yang dibuat guru.</p>${bahanExcerpt(mat)}` +
-    `<h4>LAMPIRAN 3. REFLEKSI GURU</h4><p>1. Apakah tujuan pembelajaran tercapai? ................<br>2. Kendala saat pembelajaran: ................<br>3. Rencana perbaikan: ................</p>`;
-  out += `<h4>LAMPIRAN 4. INSTRUMEN ASESMEN FORMATIF</h4><p>Disusun otomatis dari TP modul ini.</p>` + soalBody('formatif', [{ ...t, i: +m.tp }], PRESET.formatif, 'Keduanya');
+    `<h4>LAMPIRAN 2: BAHAN BACAAN GURU & PESERTA DIDIK</h4><p>Buku Panduan Guru dan Buku Siswa PJOK Kemendikdasmen, video peragaan teknik ${lm}, serta kartu aturan permainan yang dibuat guru.</p>${bahanExcerpt(mat)}` +
+    `<h4>LAMPIRAN 3: REFLEKSI GURU</h4><p>1. Apakah tujuan pembelajaran tercapai? ................<br>2. Kendala saat pembelajaran: ................<br>3. Rencana perbaikan: ................</p>`;
+  out += `<h4>LAMPIRAN 4: INSTRUMEN ASESMEN FORMATIF</h4><p>Disusun otomatis dari TP modul ini.</p>` + soalBody('formatif', [{ ...t, i: +m.tp }], PRESET.formatif, 'Keduanya');
   return out + sig();
 }
 
@@ -568,8 +571,9 @@ const b64 = s => btoa(unescape(encodeURIComponent(s)));
 function toWord(title, html, land) {
   const parts = []; let n = 0;
   html = html.replace(/src="data:(image\/[a-z+]+);base64,([^"]+)"/g, (m, t, d) => { const nm = 'img' + (n++) + '.' + t.split('/')[1].replace('+xml', ''); parts.push({ nm, t, d }); return `src="${nm}"`; });
+  html = html.replace(/<table\s*>/g, '<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%">').replace(/<table class="nb"/g, '<table class="nb" border="0" cellspacing="0" cellpadding="2"');
   const page = land ? 'size:841.9pt 595.3pt;mso-page-orientation:landscape;margin:56pt 56pt 56pt 56pt' : 'size:595.3pt 841.9pt;margin:56pt 56pt 56pt 56pt';
-  const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${title}</title><style>@page WordSection1{${page}}div.WordSection1{page:WordSection1}body{font-family:'Times New Roman';font-size:12pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #000;padding:4px;vertical-align:top}th{background:#d9e2f3}</style></head><body><div class="WordSection1">${html}</div></body></html>`;
+  const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${title}</title><style>@page WordSection1{${page}}div.WordSection1{page:WordSection1}body{font-family:'Times New Roman';font-size:12pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #000;padding:4px;vertical-align:top}th{background:#d9e2f3}table.nb td,table.nb th{border:none;background:none}</style></head><body><div class="WordSection1">${html}</div></body></html>`;
   const B = '----=_NextPart_pjok';
   let out = `MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary="${B}"; type="text/html"\r\n\r\n--${B}\r\nContent-Type: text/html; charset="utf-8"\r\nContent-Transfer-Encoding: base64\r\nContent-Location: file:///doc.htm\r\n\r\n${b64(doc)}\r\n`;
   parts.forEach(p => { out += `--${B}\r\nContent-Type: ${p.t}\r\nContent-Transfer-Encoding: base64\r\nContent-Location: file:///${p.nm}\r\n\r\n${p.d}\r\n`; });
@@ -611,9 +615,13 @@ const VIEWS = {
     uploadPanel('promes', 'Unggah contoh/format Promes sekolah sebagai arsip referensi.') +
     `<div class="card"><div class="grid">${sel('promes.sem', 'Semester', ['1', '2'], 'data-re="1"')}</div><p class="hint">Hijau = efektif, abu-abu = tidak efektif. Klik untuk mengubah.</p>${(() => { let h = ''; for (let mi = al.a; mi < al.b; mi++) { const n = Math.min(5, +S.kaldik.rows[mi].total || 0); h += `<div style="margin:4px 0"><b style="display:inline-block;width:90px">${MONTHS[mi]}</b>${Array.from({ length: n }, (_, k) => `<span class="wk ${weekOff(mi, k + 1) ? 'off' : ''}" data-act="wk" data-mi="${mi}" data-w="${k + 1}">${k + 1}</span>`).join('')}</div>`; } return h; })()}<button class="btn" data-act="resetWk">Reset ke data Minggu Efektif</button></div>` + docPanel('promes', 'Promes'); },
 
-  modul: () => head('5. Modul Ajar / RPP — Pembelajaran Mendalam', 'Memahami → Mengaplikasi → Merefleksi, lengkap dengan asesmen, rubrik, dan LKPD.') +
-    uploadPanel('modul', 'Unggah template modul ajar sekolah, bahan bacaan, atau video peragaan sebagai arsip.') +
-    `<div class="card"><div class="grid"><div><label>Pilih TP</label><select data-k="modul.tp" data-num="1">${S.tp.map((t, i) => `<option value="${i}" ${+S.modul.tp === i ? 'selected' : ''}>${i + 1}. ${esc((t.materi || '').slice(0, 50))}</option>`).join('')}</select></div>${inp('modul.n', 'Jumlah pertemuan', 'number').replace('<input', '<input data-num="1"')}${inp('modul.menit', 'Menit per JP (SD=35)', 'number').replace('<input', '<input data-num="1"')}${inp('modul.alat', 'Alat & Media')}${inp('modul.topik', 'Topik Pembelajaran', 'text', 'kosong = ikut materi')}</div><p class="hint">Komponen di bawah boleh dikosongkan — otomatis terisi teks bawaan. Isi bila ingin menyesuaikan.</p><div class="grid">${['peserta:Peserta Didik', 'lintas:Lintas Disiplin Ilmu', 'pedagogis:Praktik Pedagogis', 'kemitraan:Kemitraan Pembelajaran', 'lingkungan:Lingkungan Pembelajaran', 'digital:Pemanfaatan Digital'].map(x => { const [k, l] = x.split(':'); return `<div><label>${l}</label><textarea data-k="modul.${k}" placeholder="${esc(MD[k])}">${esc(S.modul[k] || '')}</textarea></div>`; }).join('')}</div>${S.tp.length ? '' : '<div class="warn" style="margin-top:8px">Belum ada TP untuk kelas ini. <button class="btn gold" data-act="sample">✨ Isi contoh TP Ganjil & Genap</button></div>'}</div>` + docPanel('modul', 'Modul Ajar'),
+  modul: () => head('5. Modul Ajar / RPP — Pembelajaran Mendalam', 'Struktur: Identifikasi Peserta Didik → Desain Pembelajaran → Pengalaman Pembelajaran → Asesmen.') +
+    uploadPanel('modul', 'Unggah template modul ajar sekolah atau buku/bahan ajar (.pdf/.docx/.txt) — isinya dibaca dan dikutip pada lampiran bahan bacaan.') +
+    `<div class="card"><h3>Pengaturan Dasar</h3><div class="grid"><div><label>Pilih TP</label><select data-k="modul.tp" data-num="1">${S.tp.length ? S.tp.map((t, i) => `<option value="${i}" ${+S.modul.tp === i ? 'selected' : ''}>${i + 1}. ${esc((t.materi || '').slice(0, 50))}</option>`).join('') : '<option>(belum ada TP)</option>'}</select></div>${inp('modul.jpPer', 'JP per 1 pertemuan', 'number', '3').replace('<input', '<input data-num="1"')}${inp('modul.menit', 'Menit per JP (SD=35)', 'number').replace('<input', '<input data-num="1"')}</div>${S.tp.length ? '' : '<div class="warn" style="margin-top:8px">Belum ada TP untuk kelas ini. <button class="btn gold" data-act="sample">✨ Isi contoh TP Ganjil & Genap</button></div>'}<p class="hint">Jumlah pertemuan dihitung otomatis = JP pada TP ÷ JP per pertemuan (contoh 14 JP ÷ 3 = 5 pertemuan). Kolom di bawah boleh dikosongkan — otomatis terisi teks bawaan. Isi bila ingin menyesuaikan.</p></div>` +
+    `<div class="card"><h3>A. Identifikasi Peserta Didik</h3><div class="grid"><div><label>Peserta Didik (kesiapan, minat, kebutuhan belajar)</label><textarea data-k="modul.peserta" placeholder="${esc(MD['peserta'])}">${esc(S.modul['peserta'] || '')}</textarea></div></div><p class="hint">Materi Pelajaran dan Dimensi Profil Lulusan diambil otomatis dari TP yang dipilih (ubah di menu 1).</p></div>` +
+    `<div class="card"><h3>B. Desain Pembelajaran</h3><div class="grid">${inp('modul.topik', 'Topik Pembelajaran', 'text', 'kosong = ikut materi')}<div><label>Lintas Disiplin Ilmu</label><textarea data-k="modul.lintas" placeholder="${esc(MD['lintas'])}">${esc(S.modul['lintas'] || '')}</textarea></div><div><label>Praktik Pedagogis</label><textarea data-k="modul.pedagogis" placeholder="${esc(MD['pedagogis'])}">${esc(S.modul['pedagogis'] || '')}</textarea></div><div><label>Kemitraan Pembelajaran</label><textarea data-k="modul.kemitraan" placeholder="${esc(MD['kemitraan'])}">${esc(S.modul['kemitraan'] || '')}</textarea></div><div><label>Lingkungan Pembelajaran</label><textarea data-k="modul.lingkungan" placeholder="${esc(MD['lingkungan'])}">${esc(S.modul['lingkungan'] || '')}</textarea></div><div><label>Pemanfaatan Digital</label><textarea data-k="modul.digital" placeholder="${esc(MD['digital'])}">${esc(S.modul['digital'] || '')}</textarea></div>${inp('modul.alat', 'Alat & Media')}</div><p class="hint">Capaian Pembelajaran diambil dari menu 1; Tujuan Pembelajaran dari TP terpilih.</p></div>` +
+    `<div class="card"><h3>C. Pengalaman Pembelajaran</h3><p class="hint">Disusun otomatis per pertemuan: Awal → Inti (Memahami, Mengaplikasi, Merefleksi) → Penutup, dengan prinsip berkesadaran, bermakna, dan menggembirakan. Atur jumlah pertemuan dan menit di atas.</p></div>` +
+    `<div class="card"><h3>D. Asesmen</h3><p class="hint">Asesmen awal, proses, dan akhir serta rubrik dibuat otomatis. Soal lengkap (formatif/sumatif, pengetahuan & praktik) ada di menu 6 dan sinkron dengan TP yang sama.</p></div>` + docPanel('modul', 'Modul Ajar'),
 
   soal: () => head('6. Soal & Asesmen', 'Soal formatif dan sumatif (pengetahuan & praktik) otomatis sinkron dengan TP pada Modul Ajar.') +
     uploadPanel('soal', 'Unggah buku/bahan ajar (.pdf/.docx/.txt). Kalimat penting dari bahan dipakai sebagai soal isian tambahan; soal lain dari bank soal PJOK.') +
